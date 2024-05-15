@@ -9,30 +9,16 @@ CYAN="\033[0;36m"
 NOCOLOR="\033[0m"
 RED="\033[0;31m"
 RED_BG="\033[41m"
+GREEN_BG='\033[42m'
 WHITE="\033[1;37m"
+
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 UNDERLINE=$(tput smul)
 NO_UNDERLINE=$(tput rmul)
 
-source ${PWD}/.config.sh
-
-# Function to check if a path is relative
-is_relative() {
-    case "$1" in
-        /*) return 1 ;; # absolute path
-        *) return 0 ;;  # relative path
-    esac
-}
-
-# Function to convert a relative path to absolute path
-to_absolute() {
-    if is_relative "$1"; then
-        echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-    else
-        echo "$1"
-    fi
-}
+source ${CURRENT_DIR}/.config.sh
+source ${CURRENT_DIR}/scripts/helpers.sh
 
 # Displays the command help text.
 display_help() {
@@ -155,8 +141,84 @@ if [ ! "${DRUPAL_VERSION}" ]; then
   DRUPAL_VERSION="10"
 fi
 
-validateTemplate
-validateDrupalVersion
+# Function to validate requirements
+validate_requirements() {
+  # Initialize flag to track failures
+  fail_flag=0
+
+  # Check PHP version
+  php_version=$(php -r 'echo PHP_VERSION;')
+  php_required="8.3"
+  php_check=$(echo -e "$php_version\n$php_required" | sort -V | head -n1)
+
+  if [[ "$php_check" != "$php_required" ]]; then
+    php_status="Error"
+    fail_flag=1
+  else
+    php_status="OK"
+  fi
+
+  # Check for PHP SQLite library version
+  php_sqlite_version=$(php -r 'echo SQLite3::version()["versionString"];')
+  php_sqlite_required="3.45"
+  php_sqlite_check=$(echo -e "$php_sqlite_version\n$php_sqlite_required" | sort -V | head -n1)
+
+  if [[ "$php_sqlite_check" != "$php_sqlite_required" ]]; then
+    php_sqlite_status="Error"
+    fail_flag=1
+  else
+    php_sqlite_status="OK"
+  fi
+
+  # Check if Composer is installed and version
+  if composer_version=$(composer --version 2>&1); then
+    composer_version=$(echo $composer_version | awk '{print $3}')
+    composer_required="2"
+    composer_check=$(echo -e "$composer_version\n$composer_required" | sort -V | head -n1)
+
+    if [[ "$composer_check" != "$composer_required" ]]; then
+      composer_status="Error"
+      fail_flag=1
+    else
+      composer_status="OK"
+    fi
+  else
+    composer_version="Not installed"
+    composer_status="Error"
+    fail_flag=1
+  fi
+
+  # Check if Git is installed
+  git_check=$(git --version > /dev/null 2>&1 && echo "Installed" || echo "Not installed")
+
+  if [[ "$git_check" != "Installed" ]]; then
+    git_status="Error"
+    fail_flag=1
+  else
+    git_status="OK"
+  fi
+
+  # Display results in tabular format
+  echo " ---------------------------------------------------------------"
+  # Display results in tabular format
+  echo -e " ${GREEN}Requirement${NOCOLOR}            | ${GREEN}Status${NOCOLOR}              | ${GREEN}Required Version${NOCOLOR}"
+  echo " ---------------------------------------------------------------"
+  printf " PHP Version            | %-20s | %-20s\n" "$php_status" ">=$php_required"
+  printf " PHP SQLite Version     | %-20s | %-20s\n" "$php_sqlite_status" ">=$php_sqlite_required"
+  printf " Composer               | %-20s | %-20s\n" "$composer_status" ">=$composer_required"
+  printf " Git                    | %-20s | %-20s\n" "$git_status" "Any"
+  echo " ---------------------------------------------------------------"
+
+  # Exit with status code 1 if any requirement failed
+  if [[ $fail_flag -eq 1 ]]; then
+    echo ""
+    echo -e " ${RED_BG}${WHITE}[error]${NOCOLOR} Please fix above requirement errors and re-run command."
+    echo ""
+    exit 1
+  else
+    echo -e " ${GREEN_BG}${WHITE}[success]${NOCOLOR} All OK."
+  fi
+}
 
 executeCommand() {
   printCommand "$1"
@@ -179,6 +241,12 @@ printHeading() {
 printComment() {
   echo -e "\n ${YELLOW}// $1${NOCOLOR}\n"
 }
+
+validateTemplate
+validateDrupalVersion
+printComment "Validating Drupal requirements"
+validate_requirements
+
 #if [ ! "${PROJECT_DIR}" ]; then
 #  PROJECT_DIR="${CURRENT_DIR}/drupal${DRUPAL_VERSION}"
 #  echo -e " ${YELLOW}${BOLD}[warning] ${NOCOLOR}${NORMAL}No directory defined. Using directory '${CYAN}${UNDERLINE}${PROJECT_DIR}${NO_UNDERLINE}${NOCOLOR}' to create a new project."
@@ -246,11 +314,6 @@ downloadDrupal() {
   if [ "${TEMPLATE}" = "drupal" ]; then
     executeCommand "cp ../assets/example.gitignore ${PROJECT_DIR}/.gitignore"
   fi
-
-  printHeading "Adding git to project"
-  executeCommand "git -C ${PROJECT_DIR} init"
-  executeCommand "git -C ${PROJECT_DIR} add ."
-  executeCommand "git -C ${PROJECT_DIR} commit -m 'Initial source code committed.'"
 }
 
 installDrupal() {
@@ -282,6 +345,19 @@ installDrupal() {
   printHeading "Installing Site"
   executeCommand "${PROJECT_DIR}/vendor/bin/drush site:install ${INSTALLATION_PROFILE} --account-pass=admin --yes"
 }
+
+addingGitToProject() {
+  printHeading "Adding git to project"
+  executeCommand "git -C ${PROJECT_DIR} init"
+  executeCommand "git -C ${PROJECT_DIR} add ."
+  executeCommand "git -C ${PROJECT_DIR} commit -m 'Initial source code committed.'"
+}
+
 downloadDrupal
 installDrupal
-#addModules
+addingGitToProject
+
+echo ""
+echo -e " ${GREEN_BG}${WHITE} Your Drupal ${DRUPAL_VERSION} project has been successfully created.${NOCOLOR}"
+echo ""
+exit 0
