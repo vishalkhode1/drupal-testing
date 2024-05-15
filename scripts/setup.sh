@@ -146,28 +146,40 @@ validate_requirements() {
   # Initialize flag to track failures
   fail_flag=0
 
+  php_required=("8.1" "8.2")
+  php_sqlite_required="3.37"
+  if [ "${DRUPAL_VERSION}" = "11" ]; then
+    php_required=("8.3")
+    php_sqlite_required="3.45"
+  fi
+
+  # Convert php_required array to a string
+  php_required_string=$(IFS=, ; echo "${php_required[*]}")
+  php_required_string=$(echo $php_required_string | sed 's/,/ or /g')
+
   # Check PHP version
   php_version=$(php -r 'echo PHP_VERSION;')
-  php_required="8.3"
-  php_check=$(echo -e "$php_version\n$php_required" | sort -V | head -n1)
+  php_status="${RED}Error${NOCOLOR}"
+  for required_version in "${php_required[@]}"; do
+    if [[ "$php_version" == "$required_version"* ]]; then
+      php_status="${GREEN}OK${NOCOLOR}"
+      break
+    fi
+  done
 
-  if [[ "$php_check" != "$php_required" ]]; then
-    php_status="Error"
+  if [[ "$php_status" == "${RED}Error${NOCOLOR}" ]]; then
     fail_flag=1
-  else
-    php_status="OK"
   fi
 
   # Check for PHP SQLite library version
   php_sqlite_version=$(php -r 'echo SQLite3::version()["versionString"];')
-  php_sqlite_required="3.45"
   php_sqlite_check=$(echo -e "$php_sqlite_version\n$php_sqlite_required" | sort -V | head -n1)
 
   if [[ "$php_sqlite_check" != "$php_sqlite_required" ]]; then
-    php_sqlite_status="Error"
+    php_sqlite_status="${RED}Error${NOCOLOR}"
     fail_flag=1
   else
-    php_sqlite_status="OK"
+    php_sqlite_status="${GREEN}OK${NOCOLOR}"
   fi
 
   # Check if Composer is installed and version
@@ -177,37 +189,38 @@ validate_requirements() {
     composer_check=$(echo -e "$composer_version\n$composer_required" | sort -V | head -n1)
 
     if [[ "$composer_check" != "$composer_required" ]]; then
-      composer_status="Error"
+      composer_status="${RED}Error${NOCOLOR}"
       fail_flag=1
     else
-      composer_status="OK"
+      composer_status="${GREEN}OK${NOCOLOR}"
     fi
   else
-    composer_version="Not installed"
-    composer_status="Error"
+    composer_version="Not installed${NOCOLOR}"
+    composer_status="${RED}Error${NOCOLOR}"
     fail_flag=1
   fi
 
-  # Check if Git is installed
-  git_check=$(git --version > /dev/null 2>&1 && echo "Installed" || echo "Not installed")
-
-  if [[ "$git_check" != "Installed" ]]; then
-    git_status="Error"
+  # Check Git installation
+  git_version=$(git --version 2>/dev/null)
+  if [ $? -ne 0 ]; then
+    git_status="${RED}Error${NOCOLOR}"
+    git_version="Not installed"
     fail_flag=1
   else
-    git_status="OK"
+    git_status="${GREEN}OK${NOCOLOR}"
+    git_version=$(echo "$git_version" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
   fi
 
   # Display results in tabular format
-  echo " ---------------------------------------------------------------"
+  echo " -------------------------------------------------------------------"
   # Display results in tabular format
-  echo -e " ${GREEN}Requirement${NOCOLOR}            | ${GREEN}Status${NOCOLOR}              | ${GREEN}Required Version${NOCOLOR}"
-  echo " ---------------------------------------------------------------"
-  printf " PHP Version            | %-20s | %-20s\n" "$php_status" ">=$php_required"
-  printf " PHP SQLite Version     | %-20s | %-20s\n" "$php_sqlite_status" ">=$php_sqlite_required"
-  printf " Composer               | %-20s | %-20s\n" "$composer_status" ">=$composer_required"
-  printf " Git                    | %-20s | %-20s\n" "$git_status" "Any"
-  echo " ---------------------------------------------------------------"
+  echo -e " ${GREEN}Requirement${NOCOLOR}           | ${GREEN}Status${NOCOLOR} | ${GREEN}Required Version${NOCOLOR} | ${GREEN}Current Version${NOCOLOR}"
+  echo " -------------------------------------------------------------------"
+  echo -e " PHP Version           | $php_status\t| $php_required_string\t\t| $php_version"
+  echo -e " PHP SQLite Library    | $php_sqlite_status\t| >=$php_sqlite_required\t| $php_sqlite_version"
+  echo -e " Composer              | $composer_status\t| >=$composer_required\t\t| $composer_version"
+  echo -e " Git                   | $git_status\t| Any\t\t| $git_version"
+  echo " ------------------------------------------------------------------"
 
   # Exit with status code 1 if any requirement failed
   if [[ $fail_flag -eq 1 ]]; then
@@ -309,7 +322,7 @@ downloadDrupal() {
   fi
 
   printHeading "Downloading development dependencies"
-  executeCommand "composer require drupal/core-dev:${CORE_DEV_VERSION} -d ${PROJECT_DIR} --dev"
+  executeCommand "composer require drupal/core-dev:${CORE_DEV_VERSION} -d ${PROJECT_DIR} --dev -W"
 
   if [ "${TEMPLATE}" = "drupal" ]; then
     executeCommand "cp ../assets/example.gitignore ${PROJECT_DIR}/.gitignore"
