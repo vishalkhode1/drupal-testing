@@ -8,13 +8,48 @@ NOCOLOR="\033[0m"
 WEBSERVER_PORT=8080
 CHROMEDRIVER_PORT=4444
 
-echo -e "${GREEN}Running on ${OSTYPE}${NOCOLOR}"
+TEST_PATH="$1"
 
-# This script can be executed by running ./acms-run-tests.sh from project folder. It will execute all Acquia CMS tests and quality checks for you.
+if [ ! "${TEST_PATH}" ]; then
+  echo -e " ${RED}[error]${NOCOLOR} Provide path to Tests. Ex:"
+  echo -e " ${YELLOW}./scripts/run-tests web/modules/contrib/pathauto${NOCOLOR}"
+  exit 1
+fi
+
+if [[ ! -e "${TEST_PATH}" ]]; then
+  echo -e " ${RED}[error]${NOCOLOR} Incorrect directory or file path."
+  exit 1
+fi
+
+extract_base_path() {
+  local path="$1"
+  local normalized_path=$(echo "$path" | sed 's#//*#/#g')
+  local web_index=$(echo "$normalized_path" | awk -F'/' '{for(i=1;i<=NF;i++) if($i=="web" || $i=="docroot") print i;}' | head -n 1)
+  if [ -n "$web_index" ]; then
+    echo "$normalized_path" | cut -d'/' -f1-"$web_index"
+  else
+    echo "$normalized_path"
+  fi
+}
+
+extract_module_name() {
+  local path="$1"
+  local normalized_path=$(echo "$path" | sed 's#//*#/#g')  # Normalize path
+  local value=$(echo "$normalized_path" | awk -F'/' '{ for(i=1; i<=NF; i++) { if($i == "modules" && ($(i+1) == "custom" || $(i+1) == "contrib")) { print $(i+2); exit } } }')
+  # Format the value: lowercase, remove underscores and hyphens, convert to title case
+  value=$(echo "$value" | sed 's/_/ /g' | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1' )
+  echo "$value"
+}
+
+WEB_PATH=$(extract_base_path "${TEST_PATH}")
+PROJECT_PATH=$(realpath "${WEB_PATH}/../")
+MODULE_NAME=$(extract_module_name "${TEST_PATH}")
+
+echo -e "${GREEN}Running on ${OSTYPE}${NOCOLOR}"
 
 # Install ChromeDriver based on OS.
 installchromedriver() {
-  CHROMEDRIVER=./vendor/bin/chromedriver
+  CHROMEDRIVER=${PROJECT_PATH}/vendor/bin/chromedriver
   if [ -f "$CHROMEDRIVER" ]; then
     VERSION=$("${CHROMEDRIVER}" --version | awk '{ print $2 } ')
   fi
@@ -30,7 +65,7 @@ installchromedriver() {
         curl https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip chromedriver-linux64.zip -s
         unzip chromedriver-linux64.zip
         chmod +x chromedriver-linux64/chromedriver
-        mv -f chromedriver-linux64/chromedriver ./vendor/bin
+        mv -f chromedriver-linux64/chromedriver ${PROJECT_PATH}/vendor/bin
         rm -rf chromedriver-linux64
         rm chromedriver-linux64.zip
         ;;
@@ -39,7 +74,7 @@ installchromedriver() {
         curl https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/mac-x64/chromedriver-mac-x64.zip  -o chromedriver-mac-x64.zip -s
         unzip chromedriver-mac-x64.zip
         chmod +x chromedriver-mac-x64/chromedriver
-        mv -f chromedriver-mac-x64/chromedriver ./vendor/bin
+        mv -f chromedriver-mac-x64/chromedriver ${PROJECT_PATH}/vendor/bin
         rm -rf chromedriver-mac-x64
         rm chromedriver-mac-x64.zip
         ;;
@@ -50,7 +85,7 @@ installchromedriver() {
 # Start PHP's built-in http server on port "${WEBSERVER_PORT}".
 runwebserver() {
   echo -e "${YELLOW}Starting PHP's built-in http server on "${WEBSERVER_PORT}".${NOCOLOR}"
-  nohup ./vendor/bin/drush runserver "${WEBSERVER_PORT}" &
+  nohup ${PROJECT_PATH}/vendor/bin/drush runserver "${WEBSERVER_PORT}" &
   echo -e "${GREEN}Drush server started on port "${WEBSERVER_PORT}".${NOCOLOR}"
 }
 
@@ -80,7 +115,7 @@ killProcessDarwinOs() {
 }
 
 # Kill all the processes this script has started.
-acmsExit() {
+testExit() {
   if [ $1 -eq 0 ]
   then
     echo -e "${GREEN}${2}${NOCOLOR}"
@@ -138,14 +173,6 @@ case $OSTYPE in
       ;;
 esac
 
-# Run code quality checks.
-vendor/bin/grumphp run
-
-# Check the status of grumphp, if it fails handle it gracefully.
-if [ $? -ne 0 ] ; then
-  acmsExit 1 "GrumPHP has failed. Stopping further processing!"
-fi
-
 # Set SIMPLETEST_DB environment variable if it is not set already.
 if [ -z "$(printenv SIMPLETEST_DB)" ] ; then
   export SIMPLETEST_DB=sqlite://localhost/drupal.sqlite
@@ -191,13 +218,13 @@ fi
 
 # Run all automated PHPUnit tests.
 # If --stop-on-failure is passed as an argument $1 will handle it.
-echo -e "${YELLOW}Running phpunit tests for acquia_cms. ${NOCOLOR}"
-COMPOSER_PROCESS_TIMEOUT=0 ./vendor/bin/phpunit -c docroot/core modules --debug -v $1
+echo -e "${YELLOW}Running phpunit tests for '${MODULE_NAME}' module.${NOCOLOR}"
+COMPOSER_PROCESS_TIMEOUT=0 "${PROJECT_PATH}/vendor/bin/phpunit" -c "${WEB_PATH}/core" ${TEST_PATH} --debug -v $1
 
 # Terminate all the processes
 if [ $? -ne 0 ] ;
 then
-  acmsExit 1 "PHP Tests have failed. Stopping further processing!"
+  testExit 1 "PHP Tests have failed. Stopping further processing!"
 else
-  acmsExit 0 "All tests are passing. Well done!"
+  testExit 0 "All tests are passing. Well done!"
 fi
