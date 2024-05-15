@@ -92,7 +92,7 @@ runwebserver() {
 # Run ChromeDriver on port "${CHROMEDRIVER_PORT}".
 runchromedriver() {
   echo -e "${YELLOW}Starting ChromeDriver on port "${CHROMEDRIVER_PORT}".${NOCOLOR}"
-  nohup ./vendor/bin/chromedriver --port="${CHROMEDRIVER_PORT}" &
+  nohup ${PROJECT_PATH}/vendor/bin/chromedriver --port="${CHROMEDRIVER_PORT}" &
   echo -e "${GREEN}Started ChromeDriver on port "${CHROMEDRIVER_PORT}".${NOCOLOR}"
 }
 
