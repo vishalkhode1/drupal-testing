@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CURRENT_DIR=$(PWD)
+CURRENT_DIR=${PWD}
 
 # Color codes definition.
 GREEN="\033[0;32m"
@@ -147,10 +147,12 @@ validate_requirements() {
   fail_flag=0
 
   php_required=("8.1" "8.2")
-  php_sqlite_required="3.37"
+  php_sqlite_required="3.26"
   if [ "${DRUPAL_VERSION}" = "11" ]; then
     php_required=("8.3")
     php_sqlite_required="3.45"
+  elif [ "${DRUPAL_VERSION}" = "10" ]; then
+    php_required=("8.1" "8.2" "8.3")
   fi
 
   # Convert php_required array to a string
@@ -346,7 +348,7 @@ installDrupal() {
   case $OSTYPE in
     "linux-gnu"*)
       sed -i "s/\$settings\['hash_salt'\] = '';/\$settings\['hash_salt'\] = '$hash_salt';/" ${PROJECT_DIR}/web/sites/default/settings.php
-      db_settings=$(echo "$db_settings" | sed "s#'database' => '',/'database' => '$db_name',#")
+      db_settings=$(echo "$db_settings" | sed "s|'database' => '',|'database' => '$db_name',|")
       ;;
     "darwin"*)
       sed -i '' "s/\$settings\['hash_salt'\] = '';/\$settings\['hash_salt'\] = '$hash_salt';/" ${PROJECT_DIR}/web/sites/default/settings.php
