@@ -136,10 +136,10 @@ if [[ -n $PROJECT_DIR_ARG ]]; then
 fi
 
 if [ ! "${PROJECT_DIR}" ]; then
- if [ ${AH_SITE_ENVIRONMENT} = "ide" ]; then
+ if [ "${AH_SITE_ENVIRONMENT}" = "ide" ]; then
    PROJECT_DIR="/home/ide/project"
  else
-   PROJECT_DIR="../drupal${DRUPAL_VERSION}"q
+   PROJECT_DIR="../drupal${DRUPAL_VERSION}"
  fi
  PROJECT_DIR=$(to_absolute "${PROJECT_DIR}")
  echo -e " ${YELLOW}${BOLD}[warning] ${NOCOLOR}${NORMAL}No Project directory defined. Using directory '${CYAN}${UNDERLINE}${PROJECT_DIR}${NO_UNDERLINE}${NOCOLOR}' to create a new project."

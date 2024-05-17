@@ -126,7 +126,7 @@ testExit() {
   # Kill the processes based on OS.
   case $OSTYPE in
     "linux-gnu"*)
-      if [ ! ${AH_SITE_ENVIRONMENT} = "ide" ]; then
+      if [ ! "${AH_SITE_ENVIRONMENT}" = "ide" ]; then
         echo -e "${YELLOW}Stopping drush webserver.${NOCOLOR}"
         killProcessLinuxOs "${WEBSERVER_PORT}"
         echo -e "${YELLOW}Stopping chromedriver.${NOCOLOR}"
@@ -149,7 +149,7 @@ testExit() {
 # Switch case to handle macOS and Linux.
 case $OSTYPE in
   "linux-gnu"*)
-    if [ ! ${AH_SITE_ENVIRONMENT} = "ide" ]; then
+    if [ ! "${AH_SITE_ENVIRONMENT}" = "ide" ]; then
       if declare -a array=($(tail -n +2 /proc/net/tcp | cut -d":" -f"3"|cut -d" " -f"1")) &&
         for port in ${array[@]}; do echo $((0x$port)); done | grep "${WEBSERVER_PORT}" ; then
           echo -e "${RED}Port "${WEBSERVER_PORT}" is already occupied. Web server cannot start on port "${WEBSERVER_PORT}".${NOCOLOR}"
