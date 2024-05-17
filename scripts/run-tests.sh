@@ -62,7 +62,7 @@ installchromedriver() {
     case $OSTYPE in
       "linux-gnu"*)
         # Installs chromedriver for Linux 64 bit systems.
-        curl https://storage.googleapis.com/chrome-for-testing-public/125.0.6422.60/linux64/chromedriver-linux64.zip -o chromedriver-linux64.zip -s
+        curl https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip -o chromedriver-linux64.zip -s
         unzip chromedriver-linux64.zip
         chmod +x chromedriver-linux64/chromedriver
         mv -f chromedriver-linux64/chromedriver ${PROJECT_PATH}/vendor/bin
@@ -126,10 +126,15 @@ testExit() {
   # Kill the processes based on OS.
   case $OSTYPE in
     "linux-gnu"*)
-      echo -e "${YELLOW}Stopping drush webserver.${NOCOLOR}"
-      killProcessLinuxOs "${WEBSERVER_PORT}"
-      echo -e "${YELLOW}Stopping chromedriver.${NOCOLOR}"
-      killProcessLinuxOs "${CHROMEDRIVER_PORT}"
+      if [ ! ${AH_SITE_ENVIRONMENT} = "ide" ]; then
+        echo -e "${YELLOW}Stopping drush webserver.${NOCOLOR}"
+        killProcessLinuxOs "${WEBSERVER_PORT}"
+        echo -e "${YELLOW}Stopping chromedriver.${NOCOLOR}"
+        killProcessLinuxOs "${CHROMEDRIVER_PORT}"
+      else
+        echo -e "${YELLOW}Stopping chromedriver.${NOCOLOR}"
+        pkill chromedriver
+      fi
       ;;
     "darwin"*)
       echo -e "${YELLOW}Stopping drush webserver.${NOCOLOR}"
@@ -144,20 +149,25 @@ testExit() {
 # Switch case to handle macOS and Linux.
 case $OSTYPE in
   "linux-gnu"*)
-    if declare -a array=($(tail -n +2 /proc/net/tcp | cut -d":" -f"3"|cut -d" " -f"1")) &&
-      for port in ${array[@]}; do echo $((0x$port)); done | grep "${WEBSERVER_PORT}" ; then
-        echo -e "${RED}Port "${WEBSERVER_PORT}" is already occupied. Web server cannot start on port "${WEBSERVER_PORT}".${NOCOLOR}"
-      else
-        runwebserver
+    if [ ! ${AH_SITE_ENVIRONMENT} = "ide" ]; then
+      if declare -a array=($(tail -n +2 /proc/net/tcp | cut -d":" -f"3"|cut -d" " -f"1")) &&
+        for port in ${array[@]}; do echo $((0x$port)); done | grep "${WEBSERVER_PORT}" ; then
+          echo -e "${RED}Port "${WEBSERVER_PORT}" is already occupied. Web server cannot start on port "${WEBSERVER_PORT}".${NOCOLOR}"
+        else
+          runwebserver
+      fi
+      if declare -a array=($(tail -n +2 /proc/net/tcp | cut -d":" -f"3"|cut -d" " -f"1")) &&
+        for port in ${array[@]}; do echo $((0x$port)); done | grep "${CHROMEDRIVER_PORT}" ; then
+          echo -e "${RED}Port "${CHROMEDRIVER_PORT}" is already occupied. ChromeDriver cannot run on port "${CHROMEDRIVER_PORT}". ${NOCOLOR}"
+        else
+          installchromedriver
+          runchromedriver
+      fi
+    else
+      nohup chromedriver --port=${CHROMEDRIVER_PORT} &
+      echo -e "${GREEN}Started ChromeDriver on port "${CHROMEDRIVER_PORT}".${NOCOLOR}"
     fi
-    if declare -a array=($(tail -n +2 /proc/net/tcp | cut -d":" -f"3"|cut -d" " -f"1")) &&
-      for port in ${array[@]}; do echo $((0x$port)); done | grep "${CHROMEDRIVER_PORT}" ; then
-        echo -e "${RED}Port "${CHROMEDRIVER_PORT}" is already occupied. ChromeDriver cannot run on port "${CHROMEDRIVER_PORT}". ${NOCOLOR}"
-      else
-        installchromedriver
-        runchromedriver
-    fi
-      ;;
+    ;;
   "darwin"*)
       if [ -z "$(lsof -t -i:"${WEBSERVER_PORT}")" ] ; then
         runwebserver
