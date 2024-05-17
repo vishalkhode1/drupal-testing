@@ -309,7 +309,22 @@ downloadDrupal() {
   fi
 
   printHeading "Downloading a new '${PROJECT_TEMPLATE}'"
-  executeCommand "composer create-project ${PROJECT_TEMPLATE}:${PROJECT_VERSION} ${PROJECT_DIR}"
+  if [ "${TEMPLATE}" = "acquia" ]; then
+    executeCommand "composer create-project ${PROJECT_TEMPLATE}:${PROJECT_VERSION} ${PROJECT_DIR}"
+  else
+    executeCommand "composer create-project ${PROJECT_TEMPLATE}:${PROJECT_VERSION} ${PROJECT_DIR} --no-install"
+    printHeading "Updating webroot directory"
+    case $OSTYPE in
+      "linux-gnu"*)
+        executeCommand "sed -i 's/web\//docroot\//g' ${PROJECT_DIR}/composer.json"
+      ;;
+      "darwin"*)
+        executeCommand "sed -i '' 's/web\//docroot\//g' ${PROJECT_DIR}/composer.json"
+      ;;
+    esac
+    executeCommand "composer install -d ${PROJECT_DIR}"
+  fi
+
   if [ "${TEMPLATE}" = "drupal" ]; then
     executeCommand "composer config minimum-stability dev -d ${PROJECT_DIR}"
     if [ "${DRUPAL_VERSION}" = "11" ]; then
@@ -341,20 +356,20 @@ installDrupal() {
   db_name="${PROJECT_DIR}/.default.sqlite"
 
   if [ "${TEMPLATE}" = "drupal" ]; then
-      executeCommand "cp ${PROJECT_DIR}/web/sites/default/default.settings.php ${PROJECT_DIR}/web/sites/default/settings.php"
+      executeCommand "cp ${PROJECT_DIR}/docroot/sites/default/default.settings.php ${PROJECT_DIR}/docroot/sites/default/settings.php"
       executeCommand "mkdir -p ${PROJECT_DIR}/config/default"
   fi
   case $OSTYPE in
     "linux-gnu"*)
-      sed -i "s/\$settings\['hash_salt'\] = '';/\$settings\['hash_salt'\] = '$hash_salt';/" ${PROJECT_DIR}/web/sites/default/settings.php
+      sed -i "s/\$settings\['hash_salt'\] = '';/\$settings\['hash_salt'\] = '$hash_salt';/" ${PROJECT_DIR}/docroot/sites/default/settings.php
       db_settings=$(echo "$db_settings" | sed "s|'database' => '',|'database' => '$db_name',|")
       ;;
     "darwin"*)
-      sed -i '' "s/\$settings\['hash_salt'\] = '';/\$settings\['hash_salt'\] = '$hash_salt';/" ${PROJECT_DIR}/web/sites/default/settings.php
+      sed -i '' "s/\$settings\['hash_salt'\] = '';/\$settings\['hash_salt'\] = '$hash_salt';/" ${PROJECT_DIR}/docroot/sites/default/settings.php
       db_settings=$(echo "$db_settings" | sed -e "s#'database' => '',#'database' => '$db_name',#")
       ;;
   esac
-  echo -e "\n$db_settings" >> ${PROJECT_DIR}/web/sites/default/settings.php
+  echo -e "\n$db_settings" >> ${PROJECT_DIR}/docroot/sites/default/settings.php
   printComment "Added Hash salt & db settings in settings.php"
   printHeading "Installing Site"
   executeCommand "${PROJECT_DIR}/vendor/bin/drush site:install ${INSTALLATION_PROFILE} --account-pass=admin --yes"

@@ -1,15 +1,15 @@
-/web/core
+/docroot/core
 /vendor/
-/web/sites/*/settings.*.php
-/web/sites/*/services*.yml
-/web/sites/*/files
-/web/sites/*/private
-/web/sites/simpletest
+/docroot/sites/*/settings.*.php
+/docroot/sites/*/services*.yml
+/docroot/sites/*/files
+/docroot/sites/*/private
+/docroot/sites/simpletest
 
 # Directories specific to this template
-/web/libraries
-/web/modules/contrib
-/web/profiles/contrib
-/web/themes/contrib
+/docroot/libraries
+/docroot/modules/contrib
+/docroot/profiles/contrib
+/docroot/themes/contrib
 
 .*.sqlite*
