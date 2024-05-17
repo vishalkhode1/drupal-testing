@@ -18,5 +18,3 @@ to_absolute() {
         echo "$1"
     fi
 }
-
-PROJECT_DIR=$(to_absolute "${PROJECT_DIR}")

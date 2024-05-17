@@ -64,50 +64,42 @@ display_empty_value_error() {
 }
 
 # Parse all options given to command.
-while :; do
+while [[ $# -gt 0 ]]; do
   case $1 in
     --template)
-      if [[ $2 == -* ]]; then
+      if [[ $2 == -* || -z $2 ]]; then
         display_value_error $1
         exit 1
       fi
-      if [ $2 ]; then
-        TEMPLATE=$2
-        shift
-      else
-        display_value_error $1
-        exit 1
-      fi
+      TEMPLATE=$2
+      shift 2
       ;;
     --force)
       FORCE=true
+      shift
       ;;
     --drupal)
-      if [[ $2 == -* ]]; then
+      if [[ $2 == -* || -z $2 ]]; then
         display_value_error $1
         exit 1
       fi
-      if [ $2 ]; then
-        DRUPAL_VERSION=$2
-        shift
-      else
-        display_value_error $1
-        exit 1
-      fi
+      DRUPAL_VERSION=$2
+      shift 2
       ;;
-    --template=|--drupal=|--force=) # Handle the case of an empty
+    --template=|--drupal=|--force=) # Handle the case of an empty value
       display_value_error $1
       exit 1
       ;;
     --template=?*)
       TEMPLATE=${1#*=} # Delete everything up to "=" and assign the remainder.
+      shift
       ;;
     --drupal=?*)
       DRUPAL_VERSION=${1#*=} # Delete everything up to "=" and assign the remainder.
+      shift
       ;;
     --force=?*)
-      force_opt=${1#*=} # Delete everything up to "=" and assign the remainder.
-      display_empty_value_error "--force"
+      display_value_error "--force"
       exit 1
       ;;
     --help)
@@ -116,29 +108,44 @@ while :; do
       ;;
     --) # End of all options.
       shift
-      break;;
+      break
+      ;;
     -?*)
       echo -e "${RED_BG}${WHITE}ERROR: Unknown option: $1${NOCOLOR}"
       echo
       display_help
       exit 1
       ;;
-    *) # Default case: No more options, so break out of the loop.
-    break
+    *) # If not an option, treat as positional argument
+      if [[ -z $PROJECT_DIR_ARG ]]; then
+        PROJECT_DIR_ARG=$1
+      else
+        echo -e "${RED_BG}${WHITE}Unknown argument: $1${NOCOLOR}"
+        echo
+        display_help
+        exit 1
+      fi
+      shift
+      ;;
   esac
-  shift
 done
 
-if [ ! -z "$1" ]; then
-  PROJECT_DIR=$1
+# Override PROJECT_DIR if PROJECT_DIR_ARG is set
+if [[ -n $PROJECT_DIR_ARG ]]; then
+  PROJECT_DIR=$PROJECT_DIR_ARG
 fi
 
-if [ ! "${TEMPLATE}" ]; then
-  TEMPLATE="acquia"
-fi
-
-if [ ! "${DRUPAL_VERSION}" ]; then
-  DRUPAL_VERSION="10"
+if [ ! "${PROJECT_DIR}" ]; then
+ if [ ${AH_SITE_ENVIRONMENT} = "ide" ]; then
+   PROJECT_DIR="/home/ide/project"
+ else
+   PROJECT_DIR="../drupal${DRUPAL_VERSION}"q
+ fi
+ PROJECT_DIR=$(to_absolute "${PROJECT_DIR}")
+ echo -e " ${YELLOW}${BOLD}[warning] ${NOCOLOR}${NORMAL}No Project directory defined. Using directory '${CYAN}${UNDERLINE}${PROJECT_DIR}${NO_UNDERLINE}${NOCOLOR}' to create a new project."
+else
+  # Convert to absolute path if it's relative
+  PROJECT_DIR=$(to_absolute "${PROJECT_DIR}")
 fi
 
 # Function to validate requirements
@@ -261,14 +268,6 @@ validateTemplate
 validateDrupalVersion
 printComment "Validating Drupal requirements"
 validate_requirements
-
-#if [ ! "${PROJECT_DIR}" ]; then
-#  PROJECT_DIR="${CURRENT_DIR}/drupal${DRUPAL_VERSION}"
-#  echo -e " ${YELLOW}${BOLD}[warning] ${NOCOLOR}${NORMAL}No directory defined. Using directory '${CYAN}${UNDERLINE}${PROJECT_DIR}${NO_UNDERLINE}${NOCOLOR}' to create a new project."
-#else
-  # Convert to absolute path if it's relative
-  PROJECT_DIR=$(to_absolute "${PROJECT_DIR}")
-#fi
 
 cd "$(dirname "$0")"
 
