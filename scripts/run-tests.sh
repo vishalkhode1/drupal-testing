@@ -8,7 +8,16 @@ NOCOLOR="\033[0m"
 WEBSERVER_PORT=8080
 CHROMEDRIVER_PORT=4444
 
+# The current directory path
+export CURRENT_DIR="${PWD}"
+
+cd "$(dirname "$0")"
+
+source "includes/_helpers.sh"
+
 TEST_PATH="$1"
+
+TEST_PATH=$(to_absolute "${TEST_PATH}")
 
 if [ ! "${TEST_PATH}" ]; then
   echo -e " ${RED}[error]${NOCOLOR} Provide path to Tests. Ex:"
@@ -229,7 +238,7 @@ fi
 # Run all automated PHPUnit tests.
 # If --stop-on-failure is passed as an argument $1 will handle it.
 echo -e "${YELLOW}Running phpunit tests for '${MODULE_NAME}' module.${NOCOLOR}"
-COMPOSER_PROCESS_TIMEOUT=0 "${PROJECT_PATH}/vendor/bin/phpunit" -c "${WEB_PATH}/core" ${TEST_PATH} --debug -v $1
+COMPOSER_PROCESS_TIMEOUT=0 "${PROJECT_PATH}/vendor/bin/phpunit" -c "${WEB_PATH}/core" ${TEST_PATH}
 
 # Terminate all the processes
 if [ $? -ne 0 ] ;

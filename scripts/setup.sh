@@ -1,24 +1,13 @@
 #!/bin/bash
 
-CURRENT_DIR=${PWD}
+# The current directory path
+export CURRENT_DIR="${PWD}"
 
-# Color codes definition.
-GREEN="\033[0;32m"
-YELLOW="\033[0;33m"
-CYAN="\033[0;36m"
-NOCOLOR="\033[0m"
-RED="\033[0;31m"
-RED_BG="\033[41m"
-GREEN_BG='\033[42m'
-WHITE="\033[1;37m"
+cd "$(dirname "$0")"
 
-BOLD=$(tput bold)
-NORMAL=$(tput sgr0)
-UNDERLINE=$(tput smul)
-NO_UNDERLINE=$(tput rmul)
-
-source ${CURRENT_DIR}/.config.sh
-source ${CURRENT_DIR}/scripts/helpers.sh
+source "includes/_globals.sh"
+source "includes/_colors.sh"
+source "includes/_helpers.sh"
 
 # Displays the command help text.
 display_help() {
@@ -36,19 +25,6 @@ display_help() {
     echo
 }
 
-validateTemplate() {
-  if [ "${TEMPLATE}" != "acquia" ] && [ "${TEMPLATE}" != "drupal" ]; then
-    echo -e " ${RED}${BOLD}[error]${NORMAL}${NOCOLOR} Invalid template. Allowed template: '${GREEN}acquia${NOCOLOR}' or '${GREEN}drupal${NOCOLOR}'."
-    exit 1
-  fi
-}
-
-validateDrupalVersion() {
-  if [ "${DRUPAL_VERSION}" != "9" ] && [ "${DRUPAL_VERSION}" != "10" ] && [ "${DRUPAL_VERSION}" != "11" ]; then
-    echo -e " ${RED}${BOLD}[error]${NORMAL}${NOCOLOR} Invalid Drupal version. Allowed versions: ${GREEN}9${NOCOLOR}, ${GREEN}10${NOCOLOR} or ${GREEN}11${NOCOLOR}."
-    exit 1
-  fi
-}
 # Displays non empty option value error
 display_value_error() {
   echo -e "${RED_BG}${WHITE}ERROR: Option: $1 requires a non-empty option value.${NOCOLOR}\n"
@@ -148,6 +124,22 @@ else
   PROJECT_DIR=$(to_absolute "${PROJECT_DIR}")
 fi
 
+# Validates the template option.
+validateTemplate() {
+  if [ "${TEMPLATE}" != "acquia" ] && [ "${TEMPLATE}" != "drupal" ]; then
+    echo -e " ${RED}${BOLD}[error]${NORMAL}${NOCOLOR} Invalid template. Allowed template: '${GREEN}acquia${NOCOLOR}' or '${GREEN}drupal${NOCOLOR}'."
+    exit 1
+  fi
+}
+
+# Validates the Drupal version option.
+validateDrupalVersion() {
+  if [ "${DRUPAL_VERSION}" != "9" ] && [ "${DRUPAL_VERSION}" != "10" ] && [ "${DRUPAL_VERSION}" != "11" ]; then
+    echo -e " ${RED}${BOLD}[error]${NORMAL}${NOCOLOR} Invalid Drupal version. Allowed versions: ${GREEN}9${NOCOLOR}, ${GREEN}10${NOCOLOR} or ${GREEN}11${NOCOLOR}."
+    exit 1
+  fi
+}
+
 # Function to validate requirements
 validate_requirements() {
   # Initialize flag to track failures
@@ -242,35 +234,12 @@ validate_requirements() {
   fi
 }
 
-executeCommand() {
-  printCommand "$1"
-  eval "$1"
-}
-
-printCommand() {
-  echo -e " ${YELLOW}> $1${NOCOLOR}"
-}
-
-printHeading() {
-  heading="$1:"
-  char_count=$(echo -e "${heading}" | wc -m)
-  char_count=$((char_count - 1))
-  echo -e "\n ${GREEN}${heading}${NOCOLOR}"
-  s=$(printf "%-${char_count}s" "-")
-  echo " ${s// /-}"
-}
-
-printComment() {
-  echo -e "\n ${YELLOW}// $1${NOCOLOR}\n"
-}
-
 validateTemplate
 validateDrupalVersion
 printComment "Validating Drupal requirements"
 validate_requirements
 
-cd "$(dirname "$0")"
-
+# Download the Drupal based on given project template.
 downloadDrupal() {
   if [ "${DRUPAL_VERSION}" = "9" ]; then
     PROJECT_VERSION="^9"
@@ -279,7 +248,7 @@ downloadDrupal() {
     PROJECT_VERSION="^10"
     CORE_DEV_VERSION="^10"
   else
-    PROJECT_VERSION="11.0.0-alpha1"
+    PROJECT_VERSION="11.0.0-beta1"
     CORE_DEV_VERSION="^11"
   fi
 
@@ -345,6 +314,7 @@ downloadDrupal() {
   fi
 }
 
+# Install the Drupal site.
 installDrupal() {
   printComment "Generating Hash salt"
   printCommand "php ./scripts/hash_generator.php 55"
@@ -352,7 +322,7 @@ installDrupal() {
 
   printComment "Generating settings.php"
 
-  db_settings=$(<../assets/settings.php.patch)
+  db_settings=$(<../assets/sqlite.settings.php.patch)
   db_name="${PROJECT_DIR}/.default.sqlite"
 
   if [ "${TEMPLATE}" = "drupal" ]; then
@@ -370,12 +340,15 @@ installDrupal() {
       ;;
   esac
   echo -e "\n$db_settings" >> ${PROJECT_DIR}/docroot/sites/default/settings.php
+  echo "$(<../assets/settings.php.patch)" >> ${PROJECT_DIR}/docroot/sites/default/settings.php
+
   printComment "Added Hash salt & db settings in settings.php"
   printHeading "Installing Site"
   executeCommand "${PROJECT_DIR}/vendor/bin/drush site:install ${INSTALLATION_PROFILE} --account-pass=admin --yes"
 }
 
-addingGitToProject() {
+# Add the Git to project.
+addGitToProject() {
   printHeading "Adding git to project"
   executeCommand "git -C ${PROJECT_DIR} init"
   executeCommand "git -C ${PROJECT_DIR} add ."
@@ -384,7 +357,7 @@ addingGitToProject() {
 
 downloadDrupal
 installDrupal
-addingGitToProject
+addGitToProject
 
 echo ""
 echo -e " ${GREEN_BG}${WHITE} Your Drupal ${DRUPAL_VERSION} project has been successfully created.${NOCOLOR}"
